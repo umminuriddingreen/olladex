@@ -10,6 +10,7 @@ Ollama already supports launching Codex. Olladex focuses on the operational gap 
 
 - See the active Codex provider and model before starting work.
 - Discover the models actually installed on the current machine.
+- Show those local models in Codex's model picker while the Ollama route is active.
 - Check Ollama, model, and Codex configuration readiness in one place.
 - Back up `~/.codex/config.toml` before every activation.
 - Restore the exact previous configuration with one action.
@@ -43,13 +44,14 @@ open dist/Olladex.app
 When you activate a model, Olladex:
 
 1. Copies the current file to `~/.codex/olladex-backups/config-<timestamp>.toml`.
-2. Changes only the top-level `model` and `model_provider` values.
-3. Adds the `model_providers.olladex-ollama` provider if it is absent.
-4. Writes the result atomically.
+2. Generates `~/.codex/olladex-models.json` from the models currently installed in Ollama.
+3. Changes the top-level `model`, `model_provider`, and `model_catalog_json` values.
+4. Adds the `model_providers.olladex-ollama` provider if it is absent.
+5. Writes the result atomically, then restarts Codex so its model picker reloads.
 
 The provider points to Ollama's loopback-only OpenAI-compatible Responses endpoint at `http://127.0.0.1:11434/v1/`. Existing comments, project trust, tools, MCP servers, and approval settings remain in place.
 
-> Start a new Codex task after switching. Existing tasks retain the provider with which they were created.
+While Ollama mode is active, Codex's model menu displays the local Ollama catalog. Restoring the previous configuration restores the OpenAI catalog. Existing tasks retain the provider with which they were created.
 
 ## Current scope
 

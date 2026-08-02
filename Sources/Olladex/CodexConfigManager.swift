@@ -52,6 +52,7 @@ struct CodexConfigManager {
     private var codexDirectory: URL { home.appending(path: ".codex", directoryHint: .isDirectory) }
     private var configURL: URL { codexDirectory.appending(path: "config.toml") }
     private var backupDirectory: URL { codexDirectory.appending(path: "olladex-backups", directoryHint: .isDirectory) }
+    private var catalogURL: URL { codexDirectory.appending(path: "olladex-models.json") }
 
     func currentRoute() throws -> CodexRoute {
         guard fileManager.fileExists(atPath: configURL.path) else { return .openAI(model: nil) }
@@ -66,7 +67,7 @@ struct CodexConfigManager {
         return .custom(provider: provider, model: model)
     }
 
-    func activate(model: String) throws -> ConfigReceipt {
+    func activate(model: String, availableModels: [OllamaModel]) throws -> ConfigReceipt {
         guard !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !model.contains("\n"), !model.contains("\r"), !model.contains("\"") else { throw ConfigError.invalidModel }
         try fileManager.createDirectory(at: codexDirectory, withIntermediateDirectories: true)
@@ -75,9 +76,15 @@ struct CodexConfigManager {
         let backup = backupDirectory.appending(path: "config-\(timestamp()).toml")
         try original.write(to: backup, options: .atomic)
 
+        let catalog = CodexModelCatalog(models: availableModels.map(CodexModel.init))
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(catalog).write(to: catalogURL, options: .atomic)
+
         var text = String(data: original, encoding: .utf8) ?? ""
         text = setTopLevel(key: "model", value: model, in: text)
         text = setTopLevel(key: "model_provider", value: "olladex-ollama", in: text)
+        text = setTopLevel(key: "model_catalog_json", value: catalogURL.path, in: text)
         text = upsertProvider(in: text)
         try Data(text.utf8).write(to: configURL, options: .atomic)
         return .init(backup: backup, config: configURL)
@@ -141,4 +148,51 @@ struct CodexConfigManager {
         formatter.dateFormat = "yyyyMMdd-HHmmss-SSS"
         return formatter.string(from: Date())
     }
+}
+
+private struct CodexModelCatalog: Encodable {
+    let models: [CodexModel]
+}
+
+private struct CodexModel: Encodable {
+    let baseInstructions = ""
+    let contextWindow: Int
+    let displayName: String
+    let experimentalSupportedTools: [String] = []
+    let inputModalities: [String]
+    let priority = 0
+    let shellType = "default"
+    let slug: String
+    let supportedInApi = true
+    let supportedReasoningLevels: [String] = []
+    let supportsParallelToolCalls = false
+    let supportsReasoningSummaries = false
+    let visibility = "list"
+    let truncationPolicy = TruncationPolicy(limit: 10_000, mode: "bytes")
+
+    init(_ model: OllamaModel) {
+        contextWindow = model.contextWindow ?? 32_768
+        displayName = model.name
+        inputModalities = model.capabilities?.contains("vision") == true ? ["text", "image"] : ["text"]
+        slug = model.name
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case baseInstructions = "base_instructions"
+        case contextWindow = "context_window"
+        case displayName = "display_name"
+        case experimentalSupportedTools = "experimental_supported_tools"
+        case inputModalities = "input_modalities"
+        case priority, shellType = "shell_type", slug
+        case supportedInApi = "supported_in_api"
+        case supportedReasoningLevels = "supported_reasoning_levels"
+        case supportsParallelToolCalls = "supports_parallel_tool_calls"
+        case supportsReasoningSummaries = "supports_reasoning_summaries"
+        case visibility, truncationPolicy = "truncation_policy"
+    }
+}
+
+private struct TruncationPolicy: Encodable {
+    let limit: Int
+    let mode: String
 }

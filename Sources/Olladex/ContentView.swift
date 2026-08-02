@@ -24,14 +24,14 @@ struct ContentView: View {
             }
         }
         .confirmationDialog(
-            "Route new Codex tasks through \(store.selectedModel)?",
+            "Restart Codex with \(store.selectedModel)?",
             isPresented: $store.showingActivationConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Activate local model") { Task { await store.confirmActivation() } }
+            Button("Activate and restart Codex") { Task { await store.confirmActivation() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Olladex will back up ~/.codex/config.toml before changing its provider and model keys.")
+            Text("Olladex will quit Codex, back up ~/.codex/config.toml, install the local model catalog, and reopen Codex.")
         }
     }
 
@@ -100,7 +100,7 @@ struct ContentView: View {
                 }
             }
             HStack {
-                Button("Activate local model") { store.activateSelectedModel() }
+                Button("Activate & restart Codex") { store.activateSelectedModel() }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(store.selectedModel.isEmpty || store.isWorking)
                 Button("Open Codex") { store.openCodex() }

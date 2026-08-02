@@ -51,9 +51,11 @@ final class AppStore {
         isWorking = true
         defer { isWorking = false }
         do {
-            let receipt = try config.activate(model: selectedModel)
+            await quitCodexIfRunning()
+            let receipt = try config.activate(model: selectedModel, availableModels: models)
             route = try config.currentRoute()
-            message = .init(kind: .success, text: "Local route active. Backup: \(receipt.backup.lastPathComponent)")
+            openCodex()
+            message = .init(kind: .success, text: "Local model list active. Backup: \(receipt.backup.lastPathComponent)")
         } catch {
             message = .init(kind: .error, text: error.localizedDescription)
         }
@@ -81,6 +83,16 @@ final class AppStore {
             }
         }
         message = .init(kind: .error, text: "Codex was not found in Applications.")
+    }
+
+    private func quitCodexIfRunning() async {
+        let applications = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex")
+        guard !applications.isEmpty else { return }
+        applications.forEach { $0.terminate() }
+        for _ in 0..<50 {
+            if applications.allSatisfy({ $0.isTerminated }) { return }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
     }
 }
 
